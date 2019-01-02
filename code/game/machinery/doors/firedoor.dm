@@ -386,7 +386,7 @@ var/global/list/alert_overlays_global = list()
 	investigation_log(I_ATMOS, "has been [density ? "closed" : "opened"] [alarmed ? "while alarming" : ""] by [user.real_name] ([formatPlayerPanel(user, user.ckey)]) at [formatJumpTo(get_turf(src))]")
 	return TRUE
 
-/obj/machinery/door/firedoor/horror_force(var/mob/living/carbon/human/H)
+/obj/machinery/door/firedoor/horror_force(var/mob/living/simple_animal/changeling_horror/H)
 	if(!ishorrorform(H))
 		return FALSE
 	return force_open(H)

@@ -36,7 +36,7 @@
 
 #define isslimeperson(A) (ishuman(A) && istype(A:species, /datum/species/slime))
 
-#define ishorrorform(A) (ishuman(A) && istype(A:species, /datum/species/horror))
+#define ishorrorform(A) (istype(A, /mob/living/simple_animal/changeling_horror))
 
 #define isgrue(A) (ishuman(A) && istype(A:species, /datum/species/grue))
 

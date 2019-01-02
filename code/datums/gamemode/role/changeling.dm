@@ -10,7 +10,7 @@
 	var/list/absorbed_languages = list()
 	var/list/absorbed_chems = list()
 	var/absorbedcount = 0
-	var/chem_charges = 20
+	var/chem_charges = 50 //TODO: Was 20, consider if needed to be lowered back for testing or nah
 	var/chem_recharge_rate = 0.5
 	var/chem_storage = 50
 	var/sting_range = 1
@@ -162,7 +162,7 @@ var/list/possible_changeling_IDs = list("Alpha","Beta","Gamma","Delta","Epsilon"
 /datum/power/changeling/horror_form
 	name = "Horror Form"
 	desc = "This costly evolution allows us to transform into an all-consuming abomination. We are incredibly strong, to the point that we can force open airlocks, and are immune to conventional stuns."
-	genomecost = 15
+	genomecost = 0
 	verbpath = /obj/item/verbs/changeling/proc/changeling_horror_form
 
 /datum/power/changeling/mimicvoice

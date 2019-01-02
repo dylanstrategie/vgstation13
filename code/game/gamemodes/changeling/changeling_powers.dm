@@ -141,7 +141,7 @@
 
 /obj/item/verbs/changeling/proc/changeling_horror_form()
 	set category = "Changeling"
-	set name = "Horror Form (30)"
+	set name = "Horror Form (0)" //TODO: Find a new chem cost. 0 for testing only!
 	set desc = "This costly evolution allows us to transform into an all-consuming abomination. We are incredibly strong, to the point that we can force open airlocks, and are immune to conventional stuns."
 
 	var/mob/M = loc
@@ -155,43 +155,52 @@
 		to_chat(usr, "<span class='warning'>We must be in human form before activating Horror Form.</span>")
 		return
 
-	var/datum/role/changeling/changeling = changeling_power(30, 0, 100, deny_horror = TRUE)
+	var/datum/role/changeling/changeling = changeling_power(0, 0, 100, deny_horror = TRUE)
 	if(!changeling)
 		return
 
 	var/mob/living/carbon/human/H = src
 
-	for(var/obj/item/slot in H.get_all_slots())
-		u_equip(slot, 1)
-
-	H.maxHealth = 800 /* Gonna need more than one egun to kill one of these bad boys*/
-	H.health = 800
-	H.set_species("Horror")
-	H.client.verbs |= H.species.abilities // Force ability equip.
-	H.update_icons()
-
 	monkeyizing = 1
 	canmove = 0
 	delayNextAttack(50)
-	icon = null
 	invisibility = 101
+	alpha = 0 //Oh lord, there has to be a better way
+
+	timestopped = 1 //Yeah, this is shit, but we don't want the mob inside to do ANYTHING until it's back
 
 	var/atom/movable/overlay/animation = new /atom/movable/overlay( loc )
 	H.visible_message("<span class = 'warning'>[src] emits a putrid odor as their torso splits open!</span>")
+
+	/*
+	* TODO: Keep this for greater horror
 	world << sound('sound/effects/greaterling.ogg')
 	to_chat(world, "<span class = 'sinister'>A roar pierces the air and makes your blood curdle. Uh oh.</span>")
+	*/
+
 	animation.icon_state = "blank"
 	animation.icon = 'icons/mob/mob.dmi'
 	animation.master = src
 	flick("h2horror", animation)
-	sleep(14*2) // Frames * lag
+	sleep(14) // Frames
 	qdel(animation)
+
+	var/mob/living/simple_animal/changeling_horror/horror_form = new /mob/living/simple_animal/changeling_horror(loc, H)
+
+	if(mind)
+		mind.transfer_to(horror_form)
+	else
+		horror_form.key = key
+
+	//playsound(H.loc, 'sound/effects/horrorforce2.ogg', 80)
+	//visible_message("<span class='danger'>\The [src]'s motors whine as several great tendrils begin trying to force it open!</span>")
+	//if(do_after(H, src, 32))
 
 	monkeyizing = 0
 	canmove = 1
 	delayNextAttack(0)
-	icon = null
 	invisibility = initial(invisibility)
+	alpha = initial(alpha)
 
 //removes our changeling verbs
 /mob/proc/remove_changeling_powers()

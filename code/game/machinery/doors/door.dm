@@ -174,13 +174,15 @@ var/list/all_doors = list()
 
 	denied()
 
-/obj/machinery/door/proc/horror_force(var/mob/living/carbon/human/H) //H is for HORROR, BABY!
+/obj/machinery/door/proc/horror_force(var/mob/living/simple_animal/changeling_horror/H) //H is for HORROR, BABY!
 	if(!ishorrorform(H))
 		return FALSE
 
 	playsound(H.loc, 'sound/effects/horrorforce2.ogg', 80)
 	visible_message("<span class='danger'>\The [src]'s motors whine as several great tendrils begin trying to force it open!</span>")
+	H.busy = 1
 	if(do_after(H, src, 32))
+		H.busy = 0
 		open(1)
 		visible_message("<span class='danger'>[H.name] forces \the [src] open!</span>")
 
@@ -188,6 +190,7 @@ var/list/all_doors = list()
 		for(var/obj/machinery/door/firedoor/FD in loc)
 			FD.open(1)
 	else
+		H.busy = 0
 		to_chat(H, "<span class='warning'>You fail to open \the [src].</span>")
 
 	return TRUE
