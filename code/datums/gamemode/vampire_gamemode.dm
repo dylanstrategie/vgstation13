@@ -9,13 +9,9 @@
 	name = "Power"
 	desc = "Placeholder"
 	helptext = "" // Displays the helptext if needed
-	isVerb = 0 	// Is it an active power, or passive?
-	verbpath = null // Vampires have no verbs
+	spell_path = null // Vampires have no verbs
 
 	var/blood_threeshold = 0
-	var/spell_path
-	var/id
-	var/store_in_memory = FALSE
 
 /datum/power/vampire/proc/Give(var/datum/role/vampire/V)
 	if (!istype(V))

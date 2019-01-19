@@ -13,7 +13,7 @@
 	icon_state = "c_horror"
 	icon_living = "c_horror"
 	icon_dead = "c_horror_dead"
-	speed = 1 //TODO: Check speed compared to normal clothed human
+	speed = 0.9 //TODO: Check speed compared to normal clothed human
 	size = SIZE_BIG //He's a large boy
 	a_intent = I_HURT
 	attacktext = "shreds"
@@ -40,11 +40,11 @@
 
 	var/datum/role/changeling/changeling //Store our morph's changeling role for easy access
 
-/mob/living/simple_animal/changeling_horror/New(var/loc, var/mob/living/carbon/human/H)
+/mob/living/simple_animal/changeling_horror/New(var/loc)
 
 	..(loc)
-	H.forceMove(src)
-	morph = H
+
+	morph = get_bottom_transmogrification()
 	changeling = morph.mind.GetRole(CHANGELING)
 
 /mob/living/simple_animal/changeling_horror/death(var/gibbed = FALSE)
@@ -67,55 +67,24 @@
 
 /mob/living/simple_animal/changeling_horror/Destroy()
 
-	if(morph)
-		free_morph(morph_shock = TRUE)
+	free_morph()
 	..()
 
-//Code for collapsing the form quietly
-/mob/living/simple_animal/changeling_horror/verb/demorph()
-
-	set name = "Return to Lesser Form"
-	set category = "Changeling"
-
-	visible_message("<span class='danger'>[src]'s structure breaks back down into a humanoid shape, revealing [morph]!",
-	"<span class='danger'>Your greater form carefully breaks and bends, returning you to your weaker form.</span></span>")
-	monkeyizing = 1
-	canmove = 0
-	icon = null
-	delayNextAttack(50)
-	invisibility = 101
-
-	anim(target = src, a_icon = 'icons/mob/mob.dmi', flick_anim = "h2horror_r", sleeptime = 14)
-	sleep(14) //So yeah, you still need that sleep afterwards, go figure
-
-	free_morph(morph_shock = FALSE)
-	Destroy()
-
 //Clean up the morph
-/mob/living/simple_animal/changeling_horror/proc/free_morph(var/morph_shock = 0)
+/mob/living/simple_animal/changeling_horror/proc/free_morph()
 
-	morph.forceMove(loc)
-	morph.timestopped = 0
-	if(mind)
-		mind.transfer_to(morph)
-	else
-		morph.key = key
-
-	if(morph_shock) //Exploded out of the form
-		morph.Jitter(20) //Shake us up real good
-		morph.Stun(5)
-		morph.Knockdown(5)
-	else //Calm unmorph
-		morph.Knockdown(2) //Need a second to get your senses back
-		morph.Jitter(5) //Shake us up real good
+	morph.Jitter(20) //Shake us up real good
+	morph.Stun(5)
+	morph.Knockdown(5)
 	morph.bloody_body(morph, 1) //Greater form = time for a shower, even a clean demorph. Tab up to make on shock/collapse only
-	morph = null
+
+	completely_untransmogrify()
 
 /mob/living/simple_animal/changeling_horror/ex_act(severity)
 
 	if(flags & INVULNERABLE)
 		return
-	switch (severity)
+	switch(severity)
 		if(1)
 			adjustBruteLoss(400) //Make ex_act 1 less of an instakill to prevent abuse
 
@@ -221,18 +190,6 @@
 						changeling.absorbed_dna += dna_data
 						changeling.absorbedcount++
 						Tchangeling.absorbed_dna.Remove(dna_data)
-
-				if(Tchangeling.power_holder.purchasedpowers.len)
-					for(var/datum/power/changeling/Tp in Tchangeling.power_holder.purchasedpowers)
-						if(Tp in changeling.power_holder.purchasedpowers)
-							continue
-						else
-							changeling.power_holder.purchasedpowers += Tp
-
-							if(!Tp.isVerb)
-								call(Tp.verbpath)()
-							else
-								morph.make_changeling() //Wah ?
 
 				changeling.chem_charges += Tchangeling.chem_charges
 				changeling.geneticpoints += Tchangeling.geneticpoints

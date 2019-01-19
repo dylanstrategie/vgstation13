@@ -148,11 +148,6 @@
 		if((M.mind.special_role == HIGHLANDER || M.mind.special_role == BOMBERMAN) && src.flags & CHEMFLAG_DISHONORABLE)
 			// TODO: HONORABLE_* checks.
 			return 1
-		if(dupeable && reagent_state == REAGENT_STATE_LIQUID && volume>=5 && ischangeling(M))
-			var/datum/role/changeling/C = M.mind.GetRole(CHANGELING)
-			if(!C.absorbed_chems.Find(id))
-				C.absorbed_chems.Add(id)
-				to_chat(M, "<span class = 'notice'>We have learned [src].</span>")
 
 	if((overdose_am && volume >= overdose_am) || (overdose_tick && tick >= overdose_tick)) //Too much chems, or been in your system too long
 		on_overdose(M)
@@ -4630,7 +4625,7 @@
 	id = NOTHING
 	description = "Absolutely nothing."
 	nutriment_factor = 0
-	
+
 /datum/reagent/drink/nothing/on_mob_life(var/mob/living/M)
 
     if(ishuman(M))

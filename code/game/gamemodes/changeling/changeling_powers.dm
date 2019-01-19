@@ -1,65 +1,3 @@
-//Restores our verbs. It will only restore verbs allowed during lesser (monkey) form if we are not human
-/mob/proc/make_changeling()
-	if(!mind)
-		return
-	var/datum/role/changeling/C = mind.GetRole(CHANGELING)
-	if(!C)
-		return
-
-	verbs += /datum/role/changeling/proc/EvolutionMenu
-
-	var/obj/item/verbs/changeling/verb_holder = locate() in src
-	if(!verb_holder)
-		verb_holder = new /obj/item/verbs/changeling(src)
-
-	var/lesser_form = !ishuman(src)
-
-	if(!powerinstances.len)
-		for(var/P in powers)
-			powerinstances += new P()
-
-	// Code to auto-purchase free powers.
-	for(var/datum/power/changeling/P in powerinstances)
-		if(!P.genomecost) // Is it free?
-			if(!(P in C.power_holder.purchasedpowers)) // Do we not have it already?
-				C.power_holder.purchasePower(P.name, 0)// Purchase it. Don't remake our verbs, we're doing it after this.
-
-	for(var/datum/power/changeling/P in C.power_holder.purchasedpowers)
-		if(P.isVerb)
-			if(lesser_form && !P.allowduringlesserform)
-				continue
-			if(!(P in src.verbs))
-				verb_holder.verbs += P.verbpath
-
-	var/mob/living/carbon/human/H = src
-	dna.flavor_text = H.flavor_text
-	if(!(M_HUSK in H.mutations))
-		C.absorbed_dna |= dna
-		if(istype(H))
-			C.absorbed_species |= H.species.name
-	for(var/language in languages)
-		C.absorbed_languages |= language
-	updateChangelingHUD()
-	return 1
-
-/mob/proc/add_changeling_verb(path)
-	var/obj/item/verbs/changeling/verb_holder = locate() in src
-	if(!verb_holder)
-		verb_holder = new(src)
-
-	verb_holder.verbs |= path
-
-/mob/proc/remove_changeling_verb(path)
-	var/obj/item/verbs/changeling/verb_holder = locate() in src
-	if(!verb_holder)
-		return
-	if(!path)
-		returnToPool(verb_holder)
-		verb_holder = null
-		return
-
-	verb_holder.verbs -= path
-
 /mob/proc/updateChangelingHUD()
 	if(hud_used)
 		var/datum/role/changeling/changeling = mind.GetRole(CHANGELING)
@@ -76,11 +14,9 @@
 				G:<font color='#FF2828'>[changeling.absorbedcount]</font><br>\
 				[changeling.geneticdamage ? "GD: <font color='#8b0000'>[changeling.geneticdamage]</font>" : ""]\
 				</div>"
-	return
 
 //Used to dump the languages from the changeling datum into the actual mob.
 /mob/proc/changeling_update_languages(var/updated_languages)
-
 
 	languages.len = 0
 	for(var/language in updated_languages)
@@ -88,8 +24,6 @@
 
 	//This isn't strictly necessary but just to be safe...
 	add_language("Changeling")
-
-	return
 
 /obj/item/verbs/changeling/proc/changeling_change_species()
 	set category = "Changeling"
@@ -108,7 +42,7 @@
 		to_chat(src, "<span class='warning'>We may only use this power while in humanoid form.</span>")
 		return
 
-	var/datum/role/changeling/changeling = changeling_power(5,1,0)
+	var/datum/role/changeling/changeling = changeling_power(5, 1, 0)
 	if(!changeling)
 		return
 
@@ -139,280 +73,163 @@
 
 	return 1
 
-/obj/item/verbs/changeling/proc/changeling_horror_form()
-	set category = "Changeling"
-	set name = "Horror Form (0)" //TODO: Find a new chem cost. 0 for testing only!
-	set desc = "This costly evolution allows us to transform into an all-consuming abomination. We are incredibly strong, to the point that we can force open airlocks, and are immune to conventional stuns."
+/spell/horror_form
+	name = "Horror Form"
+	desc = "We become greater. We are incredibly strong, to the point that we can force open airlocks and are immune to conventional stuns, but this form is unstable yet."
+	abbreviation = "HF"
 
-	var/mob/M = loc
-	if(!istype(M))
-		return
+	school = "changeling"
+	user_type = USER_TYPE_CHANGELING
 
-	M.changeling_horror_form()
+	charge_type = Sp_RECHARGE
+	charge_max = 2 MINUTES
+	cooldown_min = 2 MINUTES
+	range = 0
+	spell_flags = STATALLOWED | NEEDSHUMAN
+	invocation = ""
+	invocation_type = SpI_NONE
 
-/mob/proc/changeling_horror_form()
-	if(!istype(src, /mob/living/carbon/human))
-		to_chat(usr, "<span class='warning'>We must be in human form before activating Horror Form.</span>")
-		return
+	override_base = "genetic" //For now, I guess
+	hud_state = "ling_horror"
 
-	var/datum/role/changeling/changeling = changeling_power(0, 0, 100, deny_horror = TRUE)
-	if(!changeling)
-		return
+	var/chemical_cost = 30
 
-	var/mob/living/carbon/human/H = src
+/spell/horror_form/cast_check(var/skipcharge = 0, var/mob/user = usr)
+	. = ..()
+	if (!.) // No need to go further.
+		return FALSE
+	if(!user.changeling_power(chemical_cost, 0, 0))
+		return FALSE
 
-	monkeyizing = 1
-	canmove = 0
-	delayNextAttack(50)
-	invisibility = 101
-	alpha = 0 //Oh lord, there has to be a better way
+/spell/horror_form/choose_targets(var/mob/user = usr)
+	return list(user) // Self-cast
 
-	timestopped = 1 //Yeah, this is shit, but we don't want the mob inside to do ANYTHING until it's back
+/spell/horror_form/cast(var/list/targets, var/mob/user)
+	if(!user.client)
+		return FALSE
 
-	var/atom/movable/overlay/animation = new /atom/movable/overlay( loc )
-	H.visible_message("<span class = 'warning'>[src] emits a putrid odor as their torso splits open!</span>")
+	user.monkeyizing = 1
+	user.canmove = 0
+	user.delayNextAttack(50)
+	user.invisibility = 101
+	user.alpha = 0 //Oh lord, there has to be a better way
 
-	/*
-	* TODO: Keep this for greater horror
-	world << sound('sound/effects/greaterling.ogg')
-	to_chat(world, "<span class = 'sinister'>A roar pierces the air and makes your blood curdle. Uh oh.</span>")
-	*/
-
-	animation.icon_state = "blank"
-	animation.icon = 'icons/mob/mob.dmi'
-	animation.master = src
-	flick("h2horror", animation)
+	user.visible_message("<span class='danger'>[user] emits a putrid odor as their torso splits open!</span>")
+	playsound(user.loc, 'sound/effects/gib1.ogg', 50, 0)
+	anim(target = user, a_icon = 'icons/mob/mob.dmi', flick_anim = "h2horror", sleeptime = 14)
 	sleep(14) // Frames
-	qdel(animation)
 
-	var/mob/living/simple_animal/changeling_horror/horror_form = new /mob/living/simple_animal/changeling_horror(loc, H)
+	user.transmogrify(/mob/living/simple_animal/changeling_horror, /spell/horror_form_revert)
 
-	if(mind)
-		mind.transfer_to(horror_form)
-	else
-		horror_form.key = key
+	user.monkeyizing = 0
+	user.canmove = 1
+	user.delayNextAttack(0)
+	user.invisibility = initial(user.invisibility)
+	user.alpha = initial(user.alpha)
 
-	//playsound(H.loc, 'sound/effects/horrorforce2.ogg', 80)
-	//visible_message("<span class='danger'>\The [src]'s motors whine as several great tendrils begin trying to force it open!</span>")
-	//if(do_after(H, src, 32))
+/spell/horror_form_revert
+	name = "Normal Form"
+	desc = "We return to our normal form. We will be knocked out for a bit."
+	abbreviation = "NF"
 
-	monkeyizing = 0
-	canmove = 1
-	delayNextAttack(0)
-	invisibility = initial(invisibility)
-	alpha = initial(alpha)
+	school = "changeling"
+	user_type = USER_TYPE_CHANGELING
 
-//removes our changeling verbs
-/mob/proc/remove_changeling_powers()
-	if(!mind)
-		return
-	var/datum/role/changeling/changeling = mind.GetRole(CHANGELING)
-	if(!changeling)
-		return
-	var/obj/item/verbs/changeling/verb_holder = locate() in src
-	if(!verb_holder)
-		return
+	charge_max = 1
+	range = 0
+	invocation = ""
+	invocation_type = SpI_NONE
+	spell_flags = STATALLOWED
 
-	for(var/datum/power/changeling/P in changeling.power_holder.purchasedpowers)
-		if(P.isVerb)
-			verb_holder.verbs -= P.verbpath
+	override_base = "genetic" //For now, I guess
+	hud_state = "ling_normal"
 
-	returnToPool(verb_holder)
-	verb_holder = null
+/spell/horror_form/choose_targets(var/mob/user = usr)
+	return list(user) // Self-cast
 
+/spell/horror_form_revert/cast(var/list/targets, mob/user)
+	user.visible_message("<span class='danger'>[user]'s structure breaks back down into a humanoid shape, revealing [user.get_top_transmogrification()]!",
+	"<span class='danger'>Your greater form carefully breaks and bends, returning you to your weaker form.</span></span>")
+	user.monkeyizing = 1
+	user.canmove = 0
+	user.icon = null
+	user.delayNextAttack(50)
+	user.invisibility = 101
+	anim(target = user, a_icon = 'icons/mob/mob.dmi', flick_anim = "h2horror_r", sleeptime = 14)
+	sleep(14) //So yeah, you still need that sleep afterwards, go figure
+
+	user.transmogrify()
+	user.Knockdown(2) //Need a second to get your senses back
+	user.Jitter(5) //Shake us up real good
+	user.remove_spell(src)
 
 //Helper proc. Does all the checks and stuff for us to avoid copypasta
-/mob/proc/changeling_power(var/required_chems=0, var/required_dna=0, var/max_genetic_damage=100, var/max_stat=0, var/deny_horror=0)
+/mob/proc/changeling_power(var/required_chems = 0, var/required_dna = 0, var/max_genetic_damage = 100, var/max_stat = 0)
 
 	if(timestopped)
 		return 0 //under effects of time magick
 
-	if(!src.mind)
-		return
-	if(!iscarbon(src))
-		return
+	if(!mind)
+		return 0
 
-	var/datum/role/changeling/changeling = src.mind.GetRole(CHANGELING)
+	var/datum/role/changeling/changeling = mind.GetRole(CHANGELING)
 	if(!changeling)
 		world.log << "[src] has the changeling_transform() verb but is not a changeling."
-		return
+		return 0
 
-	if(src.stat > max_stat)
+	if(stat > max_stat)
 		to_chat(src, "<span class='warning'>We are incapacitated.</span>")
-		return
+		return 0
 
 	if(changeling.absorbed_dna.len < required_dna)
 		to_chat(src, "<span class='warning'>We require at least [required_dna] samples of compatible DNA.</span>")
-		return
+		return 0
 
 	if(changeling.chem_charges < required_chems)
 		to_chat(src, "<span class='warning'>We require at least [required_chems] units of chemicals to do that!</span>")
-		return
+		return 0
 
 	if(changeling.geneticdamage > max_genetic_damage)
 		to_chat(src, "<span class='warning'>Our genomes are still reassembling. We need time to recover first.</span>")
-		return
+		return 0
 
-	var/mob/living/carbon/human/H = src
-	if(deny_horror && ishorrorform(H))
-		to_chat(src, "<span class='warning'>You are not permitted to taint our purity.  You cannot do this as a Horror.</span>")
-		return
-
-	return changeling
-
-/obj/item/verbs/changeling/proc/changeling_absorb_dna()
-	set category = "Changeling"
-	set name = "Absorb DNA"
-
-	var/mob/M = loc
-	if(!istype(M))
-		return
-
-	M.changeling_absorb_dna()
-
-//Absorbs the victim's DNA making them uncloneable. Requires a strong grip on the victim.
-//Doesn't cost anything as it's the most basic ability.
-/mob/proc/changeling_absorb_dna()
-	var/datum/role/changeling/changeling = changeling_power(0,0,100)
-	if(!changeling)
-		return
-
-	var/obj/item/weapon/grab/G = src.get_active_hand()
-	if(!istype(G))
-		to_chat(src, "<span class='warning'>We must be grabbing a creature in our active hand to absorb them.</span>")
-		return
-
-	var/mob/living/carbon/human/T = G.affecting
-	if(!istype(T))
-		to_chat(src, "<span class='warning'>[T] is not compatible with our biology.</span>")
-		return
-
-	if(M_NOCLONE in T.mutations)
-		to_chat(src, "<span class='warning'>This creature's DNA is ruined beyond useability!</span>")
-		return
-
-	if(!T.mind)
-		to_chat(src, "<span class='warning'>This creature's DNA is useless to us!</span>")
-		return
-
-	if(!(G.state == GRAB_KILL))
-		to_chat(src, "<span class='warning'>We must have a tighter grip to absorb this creature.</span>")
-		return
-
-	if(changeling.isabsorbing)
-		to_chat(src, "<span class='warning'>We are already absorbing!</span>")
-		return
-
-	changeling.isabsorbing = 1
-	for(var/stage = 1, stage<=3, stage++)
-		switch(stage)
-			if(1)
-				to_chat(src, "<span class='notice'>This creature is compatible. We must hold still...</span>")
-			if(2)
-				to_chat(src, "<span class='notice'>We extend a proboscis.</span>")
-				src.visible_message("<span class='warning'>[src] extends a proboscis!</span>")
-				playsound(src, 'sound/effects/lingextends.ogg', 50, 1)
-			if(3)
-				to_chat(src, "<span class='notice'>We stab [T] with the proboscis.</span>")
-				src.visible_message("<span class='danger'>[src] stabs [T] with the proboscis!</span>")
-				to_chat(T, "<span class='danger'>You feel a sharp stabbing pain!</span>")
-				playsound(src, 'sound/effects/lingstabs.ogg', 50, 1)
-				var/datum/organ/external/affecting = T.get_organ(src.zone_sel.selecting)
-				if(affecting.take_damage(39,0,1,"large organic needle"))
-					T:UpdateDamageIcon(1)
-					continue
-
-		feedback_add_details("changeling_powers","A[stage]")
-		if(!do_mob(src, T, 150))
-			to_chat(src, "<span class='warning'>Our absorption of [T] has been interrupted!</span>")
-			changeling.isabsorbing = 0
-			return
-
-	to_chat(src, "<span class='notice'>We have absorbed [T]!</span>")
-	src.visible_message("<span class='danger'>[src] sucks the fluids from [T]!</span>")
-	to_chat(T, "<span class='danger'>You have been absorbed by the changeling!</span>")
-	playsound(src, 'sound/effects/lingabsorbs.ogg', 50, 1)
-	add_attacklogs(src, T, "absorbed")
-
-	T.dna.real_name = T.real_name //Set this again, just to be sure that it's properly set.
-	T.dna.flavor_text = T.flavor_text
-	changeling.absorbed_dna |= T.dna
-
-	if(istype(src,/mob/living/carbon/human))
-		var/mob/living/carbon/human/thechangeling = src
-		var/avail_blood = T.vessel.get_reagent_amount(BLOOD)
-		for(var/datum/reagent/blood/B in thechangeling.vessel.reagent_list)
-			B.volume = min(BLOOD_VOLUME_MAX, avail_blood + B.volume)
-
-	if(src.nutrition < 400)
-		src.nutrition = min((src.nutrition + T.nutrition), 400)
-	changeling.chem_charges += 10
-	changeling.geneticpoints += 2
-
-	//Steal all of their languages!
-	for(var/language in T.languages)
-		if(!(language in changeling.absorbed_languages))
-			changeling.absorbed_languages += language
-
-	changeling_update_languages(changeling.absorbed_languages)
-
-	//Steal their species!
-	if(T.species && !(T.species.name in changeling.absorbed_species))
-		changeling.absorbed_species += T.species.name
-
-	if(T.mind)
-		var/datum/role/changeling/Tchangeling = T.mind.GetRole(CHANGELING)
-
-		if(Tchangeling)
-			if(Tchangeling.absorbed_dna)
-				for(var/dna_data in Tchangeling.absorbed_dna)	//steal all their loot
-					if(dna_data in changeling.absorbed_dna)
-						continue
-					changeling.absorbed_dna += dna_data
-					changeling.absorbedcount++
-					Tchangeling.absorbed_dna.Remove(dna_data)
-
-			if(Tchangeling.power_holder.purchasedpowers.len)
-				for(var/datum/power/changeling/Tp in Tchangeling.power_holder.purchasedpowers)
-					if(Tp in changeling.power_holder.purchasedpowers)
-						continue
-					else
-						changeling.power_holder.purchasedpowers += Tp
-
-						if(!Tp.isVerb)
-							call(Tp.verbpath)()
-						else
-							src.make_changeling()
-
-			changeling.chem_charges += Tchangeling.chem_charges
-			changeling.geneticpoints += Tchangeling.geneticpoints
-			Tchangeling.chem_charges = 0
-			Tchangeling.geneticpoints = 0
-			Tchangeling.absorbedcount = 0
-
-	changeling.absorbedcount++
-	changeling.isabsorbing = 0
-	updateChangelingHUD()
-
-	T.death(0)
-	T.Drain()
 	return 1
 
-/obj/item/verbs/changeling/proc/changeling_transform()
-	set category = "Changeling"
-	set name = "Transform (5)"
+/spell/changeling_transform
+	name = "Change Appearance (5)"
+	desc = "We take on the appearance and voice of one we have absorbed."
+	abbreviation = "CA"
 
-	var/mob/M = loc
-	if(!istype(M))
-		return
+	school = "changeling"
+	user_type = USER_TYPE_CHANGELING
 
-	M.changeling_transform()
+	charge_type = Sp_RECHARGE
+	charge_max = 30 SECONDS
+	invocation_type = SpI_NONE
+	range = 0
+	spell_flags = STATALLOWED | NEEDSHUMAN
+	cooldown_min = 30 SECONDS
 
-//Change our DNA to that of somebody we've absorbed.
-/mob/proc/changeling_transform()
-	var/datum/role/changeling/changeling = changeling_power(5,1,0, deny_horror=1)
-	if(!changeling)
-		return
+	override_base = "genetic" //For now, I guess
+	hud_state = "ling_transform"
+
+	var/chemical_cost = 5
+
+/spell/changeling_transform/cast_check(var/skipcharge = 0, var/mob/user = usr)
+	. = ..()
+	if (!.) // No need to go further.
+		return FALSE
+	if(!user.changeling_power(chemical_cost, 1, 0))
+		return FALSE
+
+/spell/changeling_transform/choose_targets(var/mob/user = usr)
+	return list(user) // Self-cast
+
+/spell/changeling_transform/cast(var/list/targets, var/mob/user)
+	if(!user.client)
+		return FALSE
+
+	var/datum/role/changeling/changeling = user.mind.GetRole(CHANGELING)
 
 	var/list/names = list()
 	for(var/datum/dna/DNA in changeling.absorbed_dna)
@@ -426,26 +243,22 @@
 	if(!chosen_dna)
 		return
 
-	changeling.chem_charges -= 5
-	src.visible_message("<span class='warning'>[src] transforms!</span>")
-	changeling.geneticdamage = 30
-	var/oldspecies = src.dna.species
-	src.dna = chosen_dna.Clone()
-	src.real_name = chosen_dna.real_name
-	src.flavor_text = chosen_dna.flavor_text
-	src.UpdateAppearance()
-	var/mob/living/carbon/human/H = src
-	if(istype(H) && oldspecies != dna.species)
+	user.visible_message("<span class='warning'>[user] transforms!</span>",
+	"<span class='notice'>You transform your identity.</span>")
+	var/oldspecies = user.dna.species
+	user.dna = chosen_dna.Clone()
+	user.real_name = chosen_dna.real_name
+	user.flavor_text = chosen_dna.flavor_text
+	user.UpdateAppearance()
+	var/mob/living/carbon/human/H = user
+	if(istype(H) && oldspecies != user.dna.species)
 		H.set_species(H.dna.species, 0)
-	domutcheck(src, null)
-	feedback_add_details("changeling_powers","TR")
+	domutcheck(user, null)
 
-	remove_changeling_verb(/obj/item/verbs/changeling/proc/changeling_transform)
-	spawn(10)
-		add_changeling_verb(/obj/item/verbs/changeling/proc/changeling_transform)
+	changeling.chem_charges -= 5
+	changeling.geneticdamage = 30
 
-	return 1
-
+/*
 /obj/item/verbs/changeling/proc/changeling_lesser_form()
 	set category = "Changeling"
 	set name = "Lesser Form (1)"
@@ -473,7 +286,7 @@
 
 //Transform into a monkey. 	//TODO replace with monkeyize proc
 /mob/proc/changeling_lesser_form()
-	var/datum/role/changeling/changeling = changeling_power(1,0,0, deny_horror=1)
+	var/datum/role/changeling/changeling = changeling_power(1, 0, 0)
 	if(!changeling)
 		return
 
@@ -503,7 +316,7 @@
 
 //Transform into a human
 /mob/proc/changeling_lesser_transform()
-	var/datum/role/changeling/changeling = changeling_power(1,1,0, deny_horror=1)
+	var/datum/role/changeling/changeling = changeling_power(1,1,0)
 	if(!changeling)
 		return
 
@@ -975,7 +788,7 @@ var/list/datum/dna/hivemind_bank = list()
 
 //Handles the general sting code to reduce on copypasta (seeming as somebody decided to make SO MANY dumb abilities)
 // allow_self=TRUE lets you sting yourself.
-/mob/proc/changeling_sting(var/required_chems=0, var/verb_path, var/allow_self=FALSE)
+/mob/proc/changeling_sting(var/required_chems = 0, var/verb_path, var/allow_self = FALSE)
 	var/datum/role/changeling/changeling = changeling_power(required_chems)
 	if(!changeling)
 		return
@@ -1027,7 +840,7 @@ var/list/datum/dna/hivemind_bank = list()
 	if(!changeling)
 		return 0
 
-	var/S = input(M, "Select the chemical: ", "Chemical IDs", null) as null|anything in changeling.absorbed_chems
+	var/S = input(M, "Select the chemical: ", "Chemical IDs", null) as null|anything in changeling.known_chems //TODO: CHANGE FROM ABSORBED CHEMS INTO PURCHASED CHEMS
 	if(!S)
 		return
 
@@ -1060,7 +873,7 @@ var/list/datum/dna/hivemind_bank = list()
 	if(!changeling)
 		return 0
 
-	var/S = input(M, "Select the chemical: ", "Chemical IDs", null) as null|anything in changeling.absorbed_chems
+	var/S = input(M, "Select the chemical: ", "Chemical IDs", null) as null|anything in changeling.known_chems //TODO: CHANGE FROM ABSORBED CHEMS INTO PURCHASED CHEMS
 	if(!S)
 		return
 
@@ -1190,3 +1003,4 @@ var/list/datum/dna/hivemind_bank = list()
 		changeling.chem_charges -= 20
 		feedback_add_details("changeling_powers","AB")
 		return 1
+*/

@@ -8,7 +8,7 @@
 	var/list/absorbed_dna = list()
 	var/list/absorbed_species = list()
 	var/list/absorbed_languages = list()
-	var/list/absorbed_chems = list()
+	var/list/known_chems = list()
 	var/absorbedcount = 0
 	var/chem_charges = 50 //TODO: Was 20, consider if needed to be lowered back for testing or nah
 	var/chem_recharge_rate = 0.5
@@ -21,10 +21,12 @@
 	var/datum/power_holder/power_holder
 	var/mimicing = ""
 
+	var/list/powers = list()
+
+	var/static/list/roundstart_powers = list(/datum/power/changeling/transform, /datum/power/changeling/horror_form) //TODO: Populate
+
 /datum/role/changeling/OnPostSetup()
 	. = ..()
-	power_holder = new(src)
-	antag.current.make_changeling()
 	var/honorific
 	if(antag.current.gender == FEMALE)
 		honorific = "Ms."
@@ -36,6 +38,10 @@
 		changelingID = "[honorific] [changelingID]"
 	else
 		changelingID = "[honorific] [rand(1,999)]"
+
+	for(var/type_CL in roundstart_powers)
+		var/datum/power/changeling/CL = new type_CL
+		CL.Give(src)
 
 /datum/role/changeling/Greet(var/greeting,var/custom)
 	if(!greeting)
@@ -59,11 +65,21 @@
 	AppendObjective(/datum/objective/target/assassinate)
 	AppendObjective(/datum/objective/target/steal)
 	if(prob(50))
-		AppendObjective(/datum/objective/chem_sample)
-	if(prob(50))
 		AppendObjective(/datum/objective/escape)
 	else
 		AppendObjective(/datum/objective/hijack)
+
+/datum/role/changeling/RemoveFromRole(var/datum/mind/M)
+	var/list/ling_spells = getAllLingSpells()
+	for(var/spell/spell in antag.current.spell_list)
+		if(is_type_in_list(spell, ling_spells))
+			antag.current.remove_spell(spell)
+	/*
+	if(antag.current.client && antag.current.hud_used)
+		if(antag.current.hud_used.vampire_blood_display)
+			antag.current.client.screen -= list(antag.current.hud_used.vampire_blood_display)
+	 */
+	..()
 
 /datum/role/changeling/proc/changelingRegen()
 	if(antag && antag.current && antag.current.stat == DEAD)
@@ -102,39 +118,60 @@ var/list/possible_changeling_IDs = list("Alpha","Beta","Gamma","Delta","Epsilon"
 	var/name = "Power"
 	var/desc = "Placeholder"
 	var/helptext = ""
-	var/isVerb = 1 	// Is it an active power, or passive?
-	var/verbpath // Path to a verb that contains the effects.
+	var/spell_path // Path to a verb that contains the effects.
+	var/store_in_memory = FALSE
+	var/id
 
 /datum/power/changeling
-	var/allowduringlesserform = 0
+	var/allow_lesser = 0 //Allowed during our monkey form
+	var/allow_greater = 0 //Allowed during horror form. Make sure it's ready for casting as a simple animal!
+	var/greater_only = 0 //Only permitted during horror form
 	var/genomecost = 500000 // Cost for the changling to evolve this power.
 
+/datum/power/changeling/proc/Give(var/datum/role/changeling/C)
+	if(!istype(C))
+		message_admins("Error: trying to give a changeling power to a non-changeling.")
+		return FALSE
 
-/datum/power/changeling/absorb_dna
-	name = "Absorb DNA"
-	desc = "Permits us to syphon the DNA from a human. They become one with us, and we become stronger."
+	if(spell_path && !(locate(spell_path) in C.antag.current.spell_list))
+		var/spell/S = new spell_path
+		C.antag.current.add_spell(S)
+
+	C.powers |= id
+
+	if(helptext)
+		to_chat(C.antag.current, "<span class = 'notice'>[helptext]</span>")
+
+	if(store_in_memory)
+		C.antag.store_memory("<font size = '1'>[helptext]</font>")
+
+/datum/power/changeling/horror_form
+	name = "Horror Form"
+	desc = "We become greater. We are incredibly strong, to the point that we can force open airlocks and are immune to conventional stuns, but this form is unstable yet."
 	genomecost = 0
-	verbpath = /obj/item/verbs/changeling/proc/changeling_absorb_dna
+	spell_path = /spell/horror_form
 
 /datum/power/changeling/transform
-	name = "Transform"
-	desc = "We take on the apperance and voice of one we have absorbed."
+	name = "Change Appearance"
+	desc = "We take on the appearance and voice of one we have absorbed."
+	id = LING_TRANS
 	genomecost = 0
-	verbpath = /obj/item/verbs/changeling/proc/changeling_transform
+	spell_path = /spell/changeling_transform
 
+/*
 /datum/power/changeling/change_species
 	name = "Change Species"
 	desc = "We take on the apperance of a species that we have absorbed."
 	genomecost = 0
-	verbpath = /obj/item/verbs/changeling/proc/changeling_change_species
+	spell_path = /obj/item/verbs/changeling/proc/changeling_change_species
 
 /datum/power/changeling/fakedeath
 	name = "Regenerative Stasis"
 	desc = "We become weakened to a death-like state, where we will rise again from death."
 	helptext = "Can be used before or after death. Duration varies greatly."
 	genomecost = 0
-	allowduringlesserform = 1
-	verbpath = /obj/item/verbs/changeling/proc/changeling_fakedeath
+	allow_lesser = 1
+	spell_path = /obj/item/verbs/changeling/proc/changeling_fakedeath
 
 // Hivemind
 
@@ -143,71 +180,67 @@ var/list/possible_changeling_IDs = list("Alpha","Beta","Gamma","Delta","Epsilon"
 	desc = "We can channel a DNA into the airwaves, allowing our fellow changelings to absorb it and transform into it as if they acquired the DNA themselves."
 	helptext = "Allows other changelings to absorb the DNA you channel from the airwaves. Will not help them towards their absorb objectives."
 	genomecost = 0
-	verbpath = /obj/item/verbs/changeling/proc/changeling_hiveupload
+	spell_path = /obj/item/verbs/changeling/proc/changeling_hiveupload
 
 /datum/power/changeling/hive_download
 	name = "Hive Absorb"
 	desc = "We can absorb a single DNA from the airwaves, allowing us to use more disguises with help from our fellow changelings."
 	helptext = "Allows you to absorb a single DNA and use it. Does not count towards your absorb objective."
 	genomecost = 0
-	verbpath = /obj/item/verbs/changeling/proc/changeling_hivedownload
+	spell_path = /obj/item/verbs/changeling/proc/changeling_hivedownload
 
 /datum/power/changeling/lesser_form
 	name = "Lesser Form"
-	desc = "We debase ourselves and become lesser.  We become a monkey."
+	desc = "We debase ourselves and become lesser. We become a monkey."
 	genomecost = 1
-	allowduringlesserform = 1
-	verbpath = /obj/item/verbs/changeling/proc/changeling_lesser_form
-
-/datum/power/changeling/horror_form
-	name = "Horror Form"
-	desc = "This costly evolution allows us to transform into an all-consuming abomination. We are incredibly strong, to the point that we can force open airlocks, and are immune to conventional stuns."
-	genomecost = 0
-	verbpath = /obj/item/verbs/changeling/proc/changeling_horror_form
+	allow_lesser = 1
+	spell_path = /obj/item/verbs/changeling/proc/changeling_lesser_form
 
 /datum/power/changeling/mimicvoice
 	name = "Mimic Voice"
 	desc = "We shape our vocal glands to sound like a desired voice."
 	helptext = "Will turn your voice into the name that you enter. We must constantly expend chemicals to maintain our form like this"
 	genomecost = 3
-	verbpath = /obj/item/verbs/changeling/proc/changeling_mimicvoice
+	spell_path = /obj/item/verbs/changeling/proc/changeling_mimicvoice
 
+//TODO: Investigate power
 /datum/power/changeling/extractdna
 	name = "Extract DNA"
 	desc = "We stealthily sting a target and extract the DNA from them."
 	helptext = "Will give you the DNA of your target, allowing you to transform into them. Does not count towards absorb objectives."
 	genomecost = 3
-	allowduringlesserform = 1
-	verbpath = /obj/item/verbs/changeling/proc/changeling_extract_dna_sting
+	allow_lesser = 1
+	spell_path = /obj/item/verbs/changeling/proc/changeling_extract_dna_sting
 
+//TODO: Investigate power
 /datum/power/changeling/transformation_sting
 	name = "Transformation Sting"
 	desc = "We silently sting a human, injecting a retrovirus that forces them to transform into another."
 	helptext = "Does not provide a warning to others. The victim will transform much like a changeling would."
 	genomecost = 3
-	verbpath = /obj/item/verbs/changeling/proc/changeling_transformation_sting
+	spell_path = /obj/item/verbs/changeling/proc/changeling_transformation_sting
 
 /datum/power/changeling/boost_range
 	name = "Boost Range"
 	desc = "We evolve the ability to shoot our stingers at humans, with some preperation."
 	genomecost = 2
-	allowduringlesserform = 1
-	verbpath = /obj/item/verbs/changeling/proc/changeling_boost_range
+	allow_lesser = 1
+	spell_path = /obj/item/verbs/changeling/proc/changeling_boost_range
 
 /datum/power/changeling/Epinephrine
 	name = "Epinephrine sacs"
 	desc = "We evolve additional sacs of adrenaline throughout our body."
 	helptext = "Gives the ability to instantly recover from stuns.  High chemical cost."
 	genomecost = 4
-	verbpath = /obj/item/verbs/changeling/proc/changeling_unstun
+	spell_path = /obj/item/verbs/changeling/proc/changeling_unstun
 
 /datum/power/changeling/ChemicalSynth
 	name = "Rapid Chemical-Synthesis"
 	desc = "We evolve new pathways for producing our necessary chemicals, permitting us to naturally create them faster."
 	helptext = "Doubles the rate at which we naturally recharge chemicals."
 	genomecost = 4
-	isVerb = 0
-	verbpath = /mob/proc/changeling_fastchemical
+	////isVerb = 0
+	spell_path = /mob/proc/changeling_fastchemical
 /*
 /datum/power/changeling/AdvChemicalSynth
 	name = "Advanced Chemical-Synthesis"
@@ -215,60 +248,61 @@ var/list/possible_changeling_IDs = list("Alpha","Beta","Gamma","Delta","Epsilon"
 	helptext = "Doubles the rate at which we naturally recharge chemicals."
 	genomecost = 8
 	isVerb = 0
-	verbpath = /mob/proc/changeling_fastchemical
+	spell_path = /mob/proc/changeling_fastchemical
 */
 /datum/power/changeling/EngorgedGlands
 	name = "Engorged Chemical Glands"
 	desc = "Our chemical glands swell, permitting us to store more chemicals inside of them."
 	helptext = "Allows us to store an extra 25 units of chemicals."
 	genomecost = 4
-	isVerb = 0
-	verbpath = /mob/proc/changeling_engorgedglands
+	///////isVerb = 0
+	spell_path = /mob/proc/changeling_engorgedglands
 
 /datum/power/changeling/DigitalCamoflague
 	name = "Digital Camouflage"
 	desc = "We evolve the ability to distort our form and proportions, defeating common algorithms used to detect lifeforms on cameras."
 	helptext = "We cannot be tracked by camera while using this skill. We must constantly expend chemicals to maintain our form like this."
 	genomecost = 3
-	allowduringlesserform = 1
-	verbpath = /obj/item/verbs/changeling/proc/changeling_digitalcamo
+	allow_lesser = 1
+	allow_greater = 1
+	spell_path = /obj/item/verbs/changeling/proc/changeling_digitalcamo
 
 /datum/power/changeling/rapidregeneration
 	name = "Rapid Regeneration"
 	desc = "We evolve the ability to rapidly regenerate, negating the need for stasis."
 	helptext = "Heals a moderate amount of damage every tick."
 	genomecost = 8
-	verbpath = /obj/item/verbs/changeling/proc/changeling_rapidregen
+	spell_path = /obj/item/verbs/changeling/proc/changeling_rapidregen
 
 /datum/power/changeling/armblade
 	name = "Arm Blade"
 	desc = "We transform one of our arms into an organic blade that can cut through flesh and bone."
 	helptext = "The blade can be retracted by using the same verb used to manifest it. It has a chance to deflect projectiles."
 	genomecost = 5
-	verbpath = /obj/item/verbs/changeling/proc/changeling_armblade
+	spell_path = /obj/item/verbs/changeling/proc/changeling_armblade
 
 /datum/power/changeling/chemsting
 	name = "Chemical Sting"
 	desc = "We repurpose our internal organs to process and recreate any chemicals we have learned, ready to inject into another lifeform or ourselves if needs be."
 	helptext = "This can be used to hinder others, or help ourselves, through the application of medicines or poisons."
 	genomecost = 1
-	verbpath = /obj/item/verbs/changeling/proc/changeling_chemsting
+	spell_path = /obj/item/verbs/changeling/proc/changeling_chemsting
 
 /datum/power/changeling/chemspit
 	name = "Chemical Spit"
 	desc = "We repurpose our internal organs to process and recreate any chemicals we have learned, ready to fire like projectile venom in our facing direction."
 	helptext = "Handy for firing acid at enemies, providing we have learned such chemicals."
 	genomecost = 1
-	allowduringlesserform = 1
-	verbpath = /obj/item/verbs/changeling/proc/changeling_chemspit
+	allow_lesser = 1
+	spell_path = /obj/item/verbs/changeling/proc/changeling_chemspit
 
-/datum/power_holder
-	var/datum/role/R
-	var/list/purchasedpowers = list()
+// Greater Form Powers
 
-/datum/power_holder/New(var/datum/role/newRole)
-	R = newRole
+/datum/power/changeling/greater
+	greater_only = 1
+*/
 
+/*
 /datum/power_holder/proc/EvolutionMenu()
 	if(!powerinstances.len)
 		for(var/P in powers)
@@ -537,8 +571,9 @@ var/list/possible_changeling_IDs = list("Alpha","Beta","Gamma","Delta","Epsilon"
 	"}
 
 	usr << browse(dat, "window=powers;size=900x480")
+*/
 
-
+/*
 /datum/role/changeling/proc/EvolutionMenu()
 	set category = "Changeling"
 	set desc = "Level up!"
@@ -584,12 +619,8 @@ var/list/possible_changeling_IDs = list("Alpha","Beta","Gamma","Delta","Epsilon"
 
 	purchasedpowers += Thepower
 
-	if(!Thepower.isVerb && Thepower.verbpath)
-		call(M.current, Thepower.verbpath)()
+	if(Thepower.spell_path)
+		call(M.current, Thepower.spell_path)()
 	else if(remake_verbs)
 		M.current.make_changeling()
-
-/datum/role/changeling/PostMindTransfer(var/mob/living/new_character, var/mob/living/old_character)
-	if (!power_holder) // This is for when you spawn as a new_player
-		return
-	new_character.make_changeling() // Will also restore any & all genomes/powers we have
+*/
